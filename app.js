@@ -47,7 +47,7 @@ const state = {
  * ============================================================================
  */
 function formatRupiah(angka) {
-    const num = Number(angka) || 0;
+    const num = Math.round(Number(angka) || 0);
     return new Intl.NumberFormat('id-ID', {
         style: 'currency',
         currency: 'IDR',
@@ -58,7 +58,15 @@ function formatRupiah(angka) {
 
 function formatAngkaBiasa(angka) {
     const num = Number(angka) || 0;
-    return new Intl.NumberFormat('id-ID').format(num);
+    return new Intl.NumberFormat('id-ID', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 2
+    }).format(num);
+}
+
+function formatQty(qty) {
+    const num = Number(qty) || 0;
+    return parseFloat(num.toFixed(3));
 }
 
 function formatTanggalWaktu(isoString) {
@@ -158,7 +166,6 @@ function compressImageClientSide(file, maxDimension = 800, quality = 0.7) {
  * ============================================================================
  */
 document.addEventListener('DOMContentLoaded', async () => {
-    // Tampilkan Tanggal Hari Ini di Topbar
     const now = new Date();
     document.getElementById('currentDateDisplay').textContent = now.toLocaleDateString('id-ID', {
         weekday: 'long',
@@ -167,7 +174,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         year: 'numeric'
     });
 
-    // Set Default Tanggal Filter Laporan (Awal Bulan s/d Hari Ini)
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
     document.getElementById('filterTanggalMulai').value = firstDay.toISOString().split('T')[0];
     document.getElementById('filterTanggalAkhir').value = now.toISOString().split('T')[0];
@@ -208,7 +214,6 @@ function initSpaNavigation() {
             pageTitle.textContent = titleMap[targetId] || 'Sistem POS Tembakau';
             sidebar.classList.remove('show');
 
-            // Redraw DataTables saat tab dibuka agar lebar kolom rapi
             if (targetId === 'sec-produk' && state.dataTables.produk) {
                 state.dataTables.produk.columns.adjust();
             } else if (targetId === 'sec-stok' && state.dataTables.riwayatStok) {
@@ -219,7 +224,6 @@ function initSpaNavigation() {
         });
     });
 
-    // Toggle Sidebar Mobile
     document.getElementById('btnToggleSidebar').addEventListener('click', () => {
         sidebar.classList.add('show');
     });
@@ -227,7 +231,6 @@ function initSpaNavigation() {
         sidebar.classList.remove('show');
     });
 
-    // Pintasan Tombol "Buka Kasir" & "Buka Menu Restock"
     document.getElementById('btnQuickPos').addEventListener('click', () => {
         document.querySelector('.nav-item-link[data-target="sec-pos"]').click();
     });
@@ -295,7 +298,6 @@ async function fetchPengaturanToko() {
         state.pengaturan = data;
     }
 
-    // Update elemen UI
     document.getElementById('sidebarNamaToko').textContent = state.pengaturan.nama_toko;
     document.getElementById('katalogNamaToko').textContent = state.pengaturan.nama_toko;
     document.getElementById('katalogSlogan').textContent = state.pengaturan.slogan || '';
@@ -316,13 +318,11 @@ async function fetchKategori() {
     if (error) throw error;
     state.kategoriList = data || [];
 
-    // Populate Dropdown Kategori di Modal Produk
     const selectKategori = document.getElementById('prodKategoriId');
     selectKategori.innerHTML = state.kategoriList
         .map((k) => `<option value="${k.id}">${escapeHtml(k.nama_kategori)}</option>`)
         .join('');
 
-    // Populate List Kategori di Pengaturan
     const listKategori = document.getElementById('listKategoriPengaturan');
     listKategori.innerHTML = state.kategoriList
         .map((k) => `
@@ -388,7 +388,6 @@ async function fetchTransaksiLaporan() {
  * ============================================================================
  */
 function renderDashboard() {
-    // Hitung Transaksi Hari Ini (Waktu Lokal)
     const todayStr = new Date().toLocaleDateString('id-ID');
 
     const transaksiHariIni = state.transaksiList.filter((t) => {
@@ -400,7 +399,6 @@ function renderDashboard() {
     const labaHariIni = transaksiHariIni.reduce((sum, t) => sum + Number(t.laba_kotor || 0), 0);
     const totalNotaHariIni = transaksiHariIni.length;
 
-    // Produk Stok Menipis (stok_saat_ini <= batas_stok_minimum)
     const produkMenipis = state.produkList.filter(
         (p) => Number(p.stok_saat_ini) <= Number(p.batas_stok_minimum)
     );
@@ -410,7 +408,6 @@ function renderDashboard() {
     document.getElementById('statTransaksiHariIni').textContent = `${totalNotaHariIni} Nota`;
     document.getElementById('statStokMenipis').textContent = `${produkMenipis.length} Produk`;
 
-    // Tabel Stok Menipis
     const tbody = document.getElementById('tbodyStokMenipis');
     if (produkMenipis.length === 0) {
         tbody.innerHTML = `
@@ -436,8 +433,8 @@ function renderDashboard() {
                     <td class="fw-semibold"><code>${escapeHtml(p.kode_produk)}</code></td>
                     <td class="fw-semibold text-espresso">${escapeHtml(p.nama_produk)}</td>
                     <td>${escapeHtml(p.kategori?.nama_kategori || '-')}</td>
-                    <td class="text-center fw-bold ${isHabis ? 'text-danger' : 'text-warning-emphasis'}">${p.stok_saat_ini} ${escapeHtml(p.satuan)}</td>
-                    <td class="text-center text-muted">${p.batas_stok_minimum} ${escapeHtml(p.satuan)}</td>
+                    <td class="text-center fw-bold ${isHabis ? 'text-danger' : 'text-warning-emphasis'}">${formatQty(p.stok_saat_ini)} ${escapeHtml(p.satuan)}</td>
+                    <td class="text-center text-muted">${formatQty(p.batas_stok_minimum)} ${escapeHtml(p.satuan)}</td>
                     <td>${statusBadge}</td>
                     <td class="text-end">
                         <button class="btn btn-xs btn-gold fw-semibold" onclick="shortcutRestockProduk(${p.id})">
@@ -460,7 +457,7 @@ window.shortcutRestockProduk = function (produkId) {
 
 /**
  * ============================================================================
- * 2. MODUL DATA PRODUK & INVENTORI (CRUD + UPLOAD STORAGE)
+ * 2. MODUL DATA PRODUK & INVENTORI
  * ============================================================================
  */
 function renderTabelProduk() {
@@ -496,7 +493,7 @@ function renderTabelProduk() {
                         <small class="text-muted">Min. ${p.min_grosir} ${escapeHtml(p.satuan)}</small>
                     </td>
                     <td class="text-center">
-                        <span class="badge ${stokBadgeClass} fs-6">${p.stok_saat_ini}</span>
+                        <span class="badge ${stokBadgeClass} fs-6">${formatQty(p.stok_saat_ini)}</span>
                     </td>
                     <td class="text-end text-nowrap">
                         <button class="btn btn-sm btn-outline-espresso me-1" onclick="openModalEditProduk(${p.id})" title="Edit Produk">
@@ -600,7 +597,7 @@ function populateDropdownProdukStok() {
     const currentVal = select.value;
     select.innerHTML = '<option value="">-- Pilih Produk --</option>' +
         state.produkList
-            .map((p) => `<option value="${p.id}">[${escapeHtml(p.kode_produk)}] ${escapeHtml(p.nama_produk)} (Stok: ${p.stok_saat_ini} ${escapeHtml(p.satuan)})</option>`)
+            .map((p) => `<option value="${p.id}">[${escapeHtml(p.kode_produk)}] ${escapeHtml(p.nama_produk)} (Stok: ${formatQty(p.stok_saat_ini)} ${escapeHtml(p.satuan)})</option>`)
             .join('');
     if (currentVal) select.value = currentVal;
 }
@@ -634,11 +631,11 @@ function renderTabelRiwayatStok() {
                         <small class="text-muted"><code>${escapeHtml(r.produk?.kode_produk || '-')}</code></small>
                     </td>
                     <td>${badgeJenis}</td>
-                    <td class="text-center fw-bold">${tanda}${r.jumlah} ${escapeHtml(r.produk?.satuan || '')}</td>
+                    <td class="text-center fw-bold">${tanda}${formatQty(r.jumlah)} ${escapeHtml(r.produk?.satuan || '')}</td>
                     <td class="text-center small">
-                        <span class="text-muted">${r.stok_sebelum}</span>
+                        <span class="text-muted">${formatQty(r.stok_sebelum)}</span>
                         <i class="fa-solid fa-arrow-right mx-1 text-gold"></i>
-                        <strong class="text-espresso">${r.stok_sesudah}</strong>
+                        <strong class="text-espresso">${formatQty(r.stok_sesudah)}</strong>
                     </td>
                     <td class="small">${escapeHtml(r.keterangan || '-')}</td>
                 </tr>
@@ -660,7 +657,7 @@ function renderTabelRiwayatStok() {
 
 /**
  * ============================================================================
- * 4. MODUL KASIR (POINT OF SALE / POS)
+ * 4. MODUL KASIR (POINT OF SALE / POS) DENGAN INPUT NOMINAL DINAMIS
  * ============================================================================
  */
 function renderPosCategoryPills() {
@@ -720,7 +717,7 @@ function renderPosProducts() {
                         <div class="position-relative">
                             <img src="${escapeHtml(imgUrl)}" class="pos-product-img" alt="${escapeHtml(p.nama_produk)}">
                             <span class="position-absolute top-0 end-0 m-1 badge ${habis ? 'bg-danger' : 'bg-espresso text-gold'}">
-                                Stok: ${p.stok_saat_ini}
+                                Stok: ${formatQty(p.stok_saat_ini)}
                             </span>
                         </div>
                         <div class="p-2 d-flex flex-column flex-grow-1 justify-content-between">
@@ -755,12 +752,14 @@ window.addToCart = function (produkId) {
 
     const existingItem = state.cart.find((item) => item.produk_id === produkId);
     if (existingItem) {
-        if (existingItem.qty + 1 > Number(produk.stok_saat_ini)) {
-            Swal.fire('Stok Tidak Cukup', `Sisa stok ${produk.nama_produk} hanya ${produk.stok_saat_ini} ${produk.satuan}.`, 'warning');
+        const nextQty = formatQty(existingItem.qty + 1);
+        if (nextQty > Number(produk.stok_saat_ini)) {
+            Swal.fire('Stok Tidak Cukup', `Sisa stok ${produk.nama_produk} hanya ${formatQty(produk.stok_saat_ini)} ${produk.satuan}.`, 'warning');
             return;
         }
-        existingItem.qty += 1;
+        existingItem.qty = nextQty;
         applyAutoWholesaleRule(existingItem, produk);
+        existingItem.subtotal_item = Math.round(existingItem.qty * existingItem.harga_aktif);
     } else {
         const newItem = {
             produk_id: produk.id,
@@ -775,9 +774,12 @@ window.addToCart = function (produkId) {
             min_grosir: Number(produk.min_grosir),
             tipe_harga: 'ECER',
             manual_override: false,
-            harga_aktif: Number(produk.harga_ecer)
+            lock_qty_mode: false, // false = Otomatis Takaran /Pouch menyesuaikan harga tetap; true = Kunci Qty & ubah harga /Pouch
+            harga_aktif: Number(produk.harga_ecer),
+            subtotal_item: Number(produk.harga_ecer)
         };
         applyAutoWholesaleRule(newItem, produk);
+        newItem.subtotal_item = Math.round(newItem.qty * newItem.harga_aktif);
         state.cart.push(newItem);
     }
 
@@ -807,7 +809,7 @@ window.updateCartQty = function (produkId, deltaOrValue, isDirectInput = false) 
     if (itemIndex === -1) return;
 
     const item = state.cart[itemIndex];
-    const newQty = isDirectInput ? parseInt(deltaOrValue, 10) : item.qty + deltaOrValue;
+    let newQty = isDirectInput ? parseFloat(deltaOrValue) : formatQty(item.qty + deltaOrValue);
 
     if (isNaN(newQty) || newQty <= 0) {
         state.cart.splice(itemIndex, 1);
@@ -816,13 +818,91 @@ window.updateCartQty = function (produkId, deltaOrValue, isDirectInput = false) 
     }
 
     if (newQty > item.stok_tersedia) {
-        Swal.fire('Stok Terbatas', `Stok maksimal yang tersedia adalah ${item.stok_tersedia} ${item.satuan}.`, 'warning');
-        item.qty = item.stok_tersedia;
-    } else {
-        item.qty = newQty;
+        Swal.fire('Stok Terbatas', `Stok maksimal yang tersedia adalah ${formatQty(item.stok_tersedia)} ${item.satuan}.`, 'warning');
+        newQty = item.stok_tersedia;
     }
 
+    item.qty = formatQty(newQty);
     applyAutoWholesaleRule(item);
+    item.subtotal_item = Math.round(item.qty * item.harga_aktif);
+    renderCart();
+};
+
+/**
+ * FUNGSI BARU: Mengubah Nominal Harga Item Secara Dinamis (Kolom Panah Merah)
+ * Otomatis menyesuaikan takaran /Pouch terhadap harga yang sudah ditetapkan
+ */
+window.onInputNominalItem = function (produkId, rawValue) {
+    const item = state.cart.find((i) => i.produk_id === produkId);
+    if (!item) return;
+
+    const nominal = Math.max(0, Number(rawValue) || 0);
+
+    if (!item.lock_qty_mode) {
+        // MODE 1 (DEFAULT): Otomatis jumlah /Pouch menyesuaikan dengan harga yang sudah ditetapkan
+        let hargaAcuan = item.harga_ecer;
+        if (!item.manual_override && item.min_grosir > 0 && item.harga_grosir > 0) {
+            const estimasiQtyGrosir = nominal / item.harga_grosir;
+            if (estimasiQtyGrosir >= item.min_grosir) {
+                item.tipe_harga = 'GROSIR';
+                hargaAcuan = item.harga_grosir;
+            } else {
+                item.tipe_harga = 'ECER';
+                hargaAcuan = item.harga_ecer;
+            }
+        } else {
+            hargaAcuan = item.tipe_harga === 'GROSIR' && item.harga_grosir > 0 ? item.harga_grosir : item.harga_ecer;
+        }
+
+        item.harga_aktif = hargaAcuan;
+        let calculatedQty = hargaAcuan > 0 ? formatQty(nominal / hargaAcuan) : 0;
+
+        if (calculatedQty > item.stok_tersedia) {
+            calculatedQty = item.stok_tersedia;
+            Swal.fire('Melebihi Stok', `Maksimal pembelian sesuai sisa stok adalah ${formatQty(item.stok_tersedia)} ${item.satuan}.`, 'warning');
+        }
+
+        item.qty = calculatedQty;
+        item.subtotal_item = nominal;
+
+        // Update tampilan angka /Pouch secara live tanpa menghilangkan fokus kursor ketikan
+        const qtyInputEl = document.getElementById(`cart-qty-input-${produkId}`);
+        if (qtyInputEl) qtyInputEl.value = item.qty;
+    } else {
+        // MODE 2 (KUNCI QTY): Jumlah /Pouch tetap, harga satuan /Pouch yang menyesuaikan
+        item.subtotal_item = nominal;
+        item.harga_aktif = item.qty > 0 ? Math.round(nominal / item.qty) : nominal;
+    }
+
+    // Update label harga satuan & badge secara live
+    const priceLabelEl = document.getElementById(`cart-price-label-${produkId}`);
+    if (priceLabelEl) {
+        priceLabelEl.textContent = `@ ${formatRupiah(item.harga_aktif)} /${item.satuan}`;
+    }
+
+    const badgeEl = document.getElementById(`cart-badge-tipe-${produkId}`);
+    if (badgeEl) {
+        badgeEl.className = `badge border-0 ${item.tipe_harga === 'GROSIR' ? 'bg-gold text-espresso' : 'bg-secondary text-white'}`;
+        badgeEl.innerHTML = `<i class="fa-solid fa-repeat me-1"></i>${item.tipe_harga}`;
+    }
+
+    // Update ringkasan total di bagian atas & bawah keranjang
+    const totalItems = formatQty(state.cart.reduce((sum, i) => sum + Number(i.qty || 0), 0));
+    document.getElementById('posCartCountText').textContent = `${state.cart.length} Produk (${totalItems} Qty)`;
+
+    calculatePosTotals();
+};
+
+window.toggleLockQtyMode = function (produkId) {
+    const item = state.cart.find((i) => i.produk_id === produkId);
+    if (!item) return;
+
+    item.lock_qty_mode = !item.lock_qty_mode;
+    if (!item.lock_qty_mode) {
+        // Kembalikan ke harga tetap dan sesuaikan /Pouch
+        applyAutoWholesaleRule(item);
+        item.qty = item.harga_aktif > 0 ? formatQty(item.subtotal_item / item.harga_aktif) : 1;
+    }
     renderCart();
 };
 
@@ -838,6 +918,7 @@ window.toggleCartPriceType = function (produkId) {
     item.manual_override = true;
     item.tipe_harga = item.tipe_harga === 'ECER' ? 'GROSIR' : 'ECER';
     item.harga_aktif = item.tipe_harga === 'GROSIR' ? item.harga_grosir : item.harga_ecer;
+    item.subtotal_item = Math.round(item.qty * item.harga_aktif);
     renderCart();
 };
 
@@ -850,7 +931,7 @@ function renderCart() {
     const container = document.getElementById('posCartItems');
     const countText = document.getElementById('posCartCountText');
 
-    const totalItems = state.cart.reduce((sum, i) => sum + i.qty, 0);
+    const totalItems = formatQty(state.cart.reduce((sum, i) => sum + Number(i.qty || 0), 0));
     countText.textContent = `${state.cart.length} Produk (${totalItems} Qty)`;
 
     if (state.cart.length === 0) {
@@ -863,7 +944,9 @@ function renderCart() {
     } else {
         container.innerHTML = state.cart
             .map((item) => {
-                const subtotalItem = item.qty * item.harga_aktif;
+                const subtotalItem = item.subtotal_item !== undefined
+                    ? item.subtotal_item
+                    : Math.round(item.qty * item.harga_aktif);
                 const isGrosir = item.tipe_harga === 'GROSIR';
 
                 return `
@@ -871,24 +954,43 @@ function renderCart() {
                         <div class="d-flex justify-content-between align-items-start mb-1">
                             <div>
                                 <span class="fw-bold text-espresso small">${escapeHtml(item.nama_produk)}</span>
-                                <div class="d-flex align-items-center gap-1 mt-1">
-                                    <button type="button" class="badge border-0 ${isGrosir ? 'bg-gold text-espresso' : 'bg-secondary text-white'}" onclick="toggleCartPriceType(${item.produk_id})" title="Klik untuk ganti mode Ecer / Grosir">
+                                <div class="d-flex align-items-center flex-wrap gap-1 mt-1">
+                                    <button type="button" id="cart-badge-tipe-${item.produk_id}" class="badge border-0 ${isGrosir ? 'bg-gold text-espresso' : 'bg-secondary text-white'}" onclick="toggleCartPriceType(${item.produk_id})" title="Klik untuk ganti mode Ecer / Grosir">
                                         <i class="fa-solid fa-repeat me-1"></i>${item.tipe_harga}
                                     </button>
-                                    <small class="text-muted">@ ${formatRupiah(item.harga_aktif)}</small>
+                                    <small class="text-muted fw-semibold" id="cart-price-label-${item.produk_id}">@ ${formatRupiah(item.harga_aktif)} /${escapeHtml(item.satuan)}</small>
                                 </div>
                             </div>
-                            <button class="btn btn-xs text-danger" onclick="removeFromCart(${item.produk_id})">
+                            <button class="btn btn-xs text-danger" onclick="removeFromCart(${item.produk_id})" title="Hapus item">
                                 <i class="fa-solid fa-xmark"></i>
                             </button>
                         </div>
-                        <div class="d-flex justify-content-between align-items-center mt-2">
-                            <div class="input-group input-group-sm" style="width: 115px;">
-                                <button class="btn btn-outline-secondary px-2" type="button" onclick="updateCartQty(${item.produk_id}, -1)">-</button>
-                                <input type="number" class="form-control text-center px-1 fw-bold" value="${item.qty}" min="1" max="${item.stok_tersedia}" onchange="updateCartQty(${item.produk_id}, this.value, true)">
-                                <button class="btn btn-outline-secondary px-2" type="button" onclick="updateCartQty(${item.produk_id}, 1)">+</button>
+
+                        <div class="d-flex justify-content-between align-items-center gap-2 mt-2">
+                            <!-- Kontrol Kuantitas (/Pouch) Otomatis Menyesuaikan -->
+                            <div class="d-flex align-items-center gap-1">
+                                <div class="input-group input-group-sm" style="width: 138px;">
+                                    <button class="btn btn-outline-secondary px-2" type="button" onclick="updateCartQty(${item.produk_id}, -1)">-</button>
+                                    <input type="number" id="cart-qty-input-${item.produk_id}" class="form-control text-center px-1 fw-bold" value="${item.qty}" min="0.01" max="${item.stok_tersedia}" step="any" onchange="updateCartQty(${item.produk_id}, this.value, true)">
+                                    <button class="btn btn-outline-secondary px-2" type="button" onclick="updateCartQty(${item.produk_id}, 1)">+</button>
+                                </div>
+                                <span class="small text-muted fw-semibold">/${escapeHtml(item.satuan)}</span>
+                                <button type="button" class="btn btn-xs ${item.lock_qty_mode ? 'btn-espresso' : 'btn-outline-secondary'}" onclick="toggleLockQtyMode(${item.produk_id})" title="${item.lock_qty_mode ? 'Qty Dikunci (Ketik Rp untuk ubah harga satuan)' : 'Takaran Otomatis (Ketik Rp untuk sesuaikan jumlah /' + escapeHtml(item.satuan) + ')'}">
+                                    <i class="fa-solid ${item.lock_qty_mode ? 'fa-lock' : 'fa-scale-balanced'}"></i>
+                                </button>
                             </div>
-                            <span class="fw-bold text-espresso">${formatRupiah(subtotalItem)}</span>
+
+                            <!-- Kolom Input Harga Dinamis (Yang Ditunjuk Panah Merah) -->
+                            <div class="input-group input-group-sm" style="width: 145px;">
+                                <span class="input-group-text bg-warning-subtle text-espresso fw-bold px-2">Rp</span>
+                                <input type="number" 
+                                       class="form-control text-end fw-bold text-espresso px-2 border-warning" 
+                                       value="${subtotalItem}" 
+                                       min="0" 
+                                       step="500"
+                                       title="Ketik nominal pembelian (di bawah/di atas harga tetap), takaran /${escapeHtml(item.satuan)} akan menyesuaikan otomatis"
+                                       oninput="onInputNominalItem(${item.produk_id}, this.value)">
+                            </div>
                         </div>
                     </div>
                 `;
@@ -900,7 +1002,11 @@ function renderCart() {
 }
 
 function calculatePosTotals() {
-    const subtotal = state.cart.reduce((sum, i) => sum + i.qty * i.harga_aktif, 0);
+    const subtotal = state.cart.reduce((sum, i) => {
+        const sub = i.subtotal_item !== undefined ? Number(i.subtotal_item) : Math.round(i.qty * i.harga_aktif);
+        return sum + sub;
+    }, 0);
+
     const diskonInput = Number(document.getElementById('posDiskonInput').value) || 0;
     const diskonValid = Math.min(Math.max(0, diskonInput), subtotal);
     const totalAkhir = Math.max(0, subtotal - diskonValid);
@@ -950,11 +1056,9 @@ async function prosesTransaksiBayar() {
     const noWaPelanggan = document.getElementById('posWaPelanggan').value.trim();
     const metodeBayar = document.getElementById('posMetodeBayar').value;
 
-    // Hitung HPP dan Laba Kotor
-    const totalHpp = state.cart.reduce((sum, i) => sum + i.qty * i.harga_modal, 0);
+    const totalHpp = state.cart.reduce((sum, i) => sum + Math.round(i.qty * i.harga_modal), 0);
     const labaKotor = totalAkhir - totalHpp;
 
-    // Buat Nomor Nota Unik: INV-YYYYMMDD-XXXX
     const now = new Date();
     const datePart = now.toISOString().slice(0, 10).replace(/-/g, '');
     const randPart = Math.floor(1000 + Math.random() * 9000);
@@ -962,7 +1066,6 @@ async function prosesTransaksiBayar() {
 
     showLoading('Memproses transaksi & memotong stok...');
     try {
-        // 1. Simpan Header Transaksi ke tabel `transaksi`
         const { data: trxData, error: trxError } = await supabaseClient
             .from('transaksi')
             .insert([
@@ -986,7 +1089,6 @@ async function prosesTransaksiBayar() {
 
         if (trxError) throw trxError;
 
-        // 2. Simpan Detail Item ke tabel `transaksi_detail`
         const detailPayload = state.cart.map((item) => ({
             transaksi_id: trxData.id,
             produk_id: item.produk_id,
@@ -997,7 +1099,7 @@ async function prosesTransaksiBayar() {
             tipe_harga: item.tipe_harga,
             harga_modal_satuan: item.harga_modal,
             harga_jual_satuan: item.harga_aktif,
-            subtotal_item: item.qty * item.harga_aktif
+            subtotal_item: item.subtotal_item !== undefined ? item.subtotal_item : Math.round(item.qty * item.harga_aktif)
         }));
 
         const { error: detailError } = await supabaseClient
@@ -1006,9 +1108,8 @@ async function prosesTransaksiBayar() {
 
         if (detailError) throw detailError;
 
-        // 3. Kurangi stok_saat_ini di tabel `produk`
         for (const item of state.cart) {
-            const stokBaru = Math.max(0, item.stok_tersedia - item.qty);
+            const stokBaru = Math.max(0, formatQty(item.stok_tersedia - item.qty));
             const { error: stokErr } = await supabaseClient
                 .from('produk')
                 .update({ stok_saat_ini: stokBaru, updated_at: new Date().toISOString() })
@@ -1016,20 +1117,17 @@ async function prosesTransaksiBayar() {
             if (stokErr) throw stokErr;
         }
 
-        // Siapkan data struk
         const strukObj = {
             ...trxData,
             items: detailPayload
         };
 
-        // Reset Keranjang & Form POS
         state.cart = [];
         document.getElementById('posNamaPelanggan').value = '';
         document.getElementById('posWaPelanggan').value = '';
         document.getElementById('posDiskonInput').value = 0;
         document.getElementById('posUangDiterima').value = '';
 
-        // Refresh data di background
         await Promise.all([fetchProduk(), fetchTransaksiLaporan()]);
         renderDashboard();
         renderPosProducts();
@@ -1037,8 +1135,6 @@ async function prosesTransaksiBayar() {
         renderKatalogPublik();
 
         hideLoading();
-
-        // 4. Tampilkan Modal Struk Pembayaran
         tampilkanModalStruk(strukObj);
     } catch (err) {
         hideLoading();
@@ -1069,7 +1165,7 @@ function tampilkanModalStruk(strukData) {
             <div class="mb-1">
                 <div class="fw-bold">${escapeHtml(item.nama_produk_snapshot)} ${item.tipe_harga === 'GROSIR' ? '(G)' : ''}</div>
                 <div class="d-flex justify-content-between">
-                    <span>${item.qty} x ${formatAngkaBiasa(item.harga_jual_satuan)}</span>
+                    <span>${formatQty(item.qty)} ${escapeHtml(item.satuan_snapshot || '')} x ${formatAngkaBiasa(item.harga_jual_satuan)}</span>
                     <span>${formatAngkaBiasa(item.subtotal_item)}</span>
                 </div>
             </div>
@@ -1105,7 +1201,6 @@ function kirimStrukKeWhatsApp() {
         return;
     }
 
-    // Normalisasi Nomor WA ke kode negara 62
     let cleanPhone = rawPhone.replace(/[^0-9]/g, '');
     if (cleanPhone.startsWith('0')) {
         cleanPhone = '62' + cleanPhone.slice(1);
@@ -1127,7 +1222,7 @@ function kirimStrukKeWhatsApp() {
     (s.items || []).forEach((item) => {
         const labelGrosir = item.tipe_harga === 'GROSIR' ? ' [Grosir]' : '';
         pesan += `• *${item.nama_produk_snapshot}*${labelGrosir}\n`;
-        pesan += `  ${item.qty} x ${formatRupiah(item.harga_jual_satuan)} = *${formatRupiah(item.subtotal_item)}*\n`;
+        pesan += `  ${formatQty(item.qty)} ${item.satuan_snapshot || ''} x ${formatRupiah(item.harga_jual_satuan)} = *${formatRupiah(item.subtotal_item)}*\n`;
     });
 
     pesan += `${garis}\n`;
@@ -1155,7 +1250,6 @@ function renderTabelLaporan() {
         state.dataTables.laporan.destroy();
     }
 
-    // Hitung Summary Periode
     const totalNota = state.transaksiList.length;
     const totalOmzet = state.transaksiList.reduce((sum, t) => sum + Number(t.total_akhir || 0), 0);
     const totalDiskon = state.transaksiList.reduce((sum, t) => sum + Number(t.diskon || 0), 0);
@@ -1218,7 +1312,6 @@ function exportLaporanKeExcel() {
         return;
     }
 
-    // Sheet 1: Ringkasan Nota Transaksi
     const dataRingkasan = state.transaksiList.map((t, idx) => ({
         'No': idx + 1,
         'No. Nota': t.no_nota,
@@ -1233,7 +1326,6 @@ function exportLaporanKeExcel() {
         'Laba Kotor (Rp)': Number(t.laba_kotor)
     }));
 
-    // Sheet 2: Rincian Item Terjual per Nota
     const dataRincianItem = [];
     state.transaksiList.forEach((t) => {
         (t.transaksi_detail || []).forEach((d) => {
@@ -1272,7 +1364,6 @@ function exportLaporanKeExcel() {
  * ============================================================================
  */
 function renderKatalogPublik() {
-    // Render Kategori Pills Katalog
     const filterContainer = document.getElementById('katalogCategoryFilter');
     const pills = [
         `<button type="button" class="category-pill ${state.katalogActiveKategori === 'ALL' ? 'active' : ''}" onclick="setKatalogKategori('ALL')">Semua Varian</button>`
@@ -1285,7 +1376,6 @@ function renderKatalogPublik() {
     });
     filterContainer.innerHTML = pills.join('');
 
-    // Filter Produk Katalog
     const keyword = document.getElementById('katalogSearchInput').value.trim().toLowerCase();
     const filtered = state.produkList.filter((p) => {
         const matchKat = state.katalogActiveKategori === 'ALL' || String(p.kategori_id) === String(state.katalogActiveKategori);
@@ -1311,7 +1401,7 @@ function renderKatalogPublik() {
                         <div class="position-relative">
                             <img src="${escapeHtml(imgUrl)}" class="w-100" style="height: 170px; object-fit: cover;" alt="${escapeHtml(p.nama_produk)}">
                             <span class="position-absolute top-0 end-0 m-2 badge ${stok > 0 ? 'bg-success' : 'bg-danger'}">
-                                ${stok > 0 ? `Tersedia (${stok}${escapeHtml(p.satuan)})` : 'Stok Habis'}
+                                ${stok > 0 ? `Tersedia (${formatQty(stok)}${escapeHtml(p.satuan)})` : 'Stok Habis'}
                             </span>
                         </div>
                         <div class="card-body d-flex flex-column justify-content-between">
@@ -1352,10 +1442,8 @@ window.setKatalogKategori = function (katId) {
  * ============================================================================
  */
 function initEventListeners() {
-    // Refresh Data Manual
     document.getElementById('btnRefreshData').addEventListener('click', loadAllInitialData);
 
-    // Buka Modal Tambah Produk Baru
     document.getElementById('btnTambahProduk').addEventListener('click', () => {
         state.compressedImageBlob = null;
         document.getElementById('formProduk').reset();
@@ -1370,12 +1458,10 @@ function initEventListeners() {
         modal.show();
     });
 
-    // Generate Kode Produk
     document.getElementById('btnGenKode').addEventListener('click', () => {
         document.getElementById('prodKode').value = generateKodeProdukOtomatis();
     });
 
-    // Kompresi Gambar Otomatis saat File Dipilih
     document.getElementById('prodFotoInput').addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -1396,7 +1482,6 @@ function initEventListeners() {
         }
     });
 
-    // Submit Form Simpan Produk (Tambah / Edit + Upload Supabase Storage)
     document.getElementById('formProduk').addEventListener('submit', async (e) => {
         e.preventDefault();
 
@@ -1405,7 +1490,6 @@ function initEventListeners() {
 
         showLoading('Menyimpan produk & mengunggah foto...');
         try {
-            // Jika ada foto baru yang sudah dikompres, unggah ke bucket `produk-images`
             if (state.compressedImageBlob) {
                 const fileName = `prod_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.jpg`;
                 const { error: uploadErr } = await supabaseClient.storage
@@ -1461,23 +1545,21 @@ function initEventListeners() {
         }
     });
 
-    // Pilihan Produk di Form Riwayat Stok
     document.getElementById('stokProdukId').addEventListener('change', (e) => {
         const prod = state.produkList.find((p) => String(p.id) === String(e.target.value));
         const infoEl = document.getElementById('infoStokSaatIni');
         if (prod) {
-            infoEl.textContent = `Stok saat ini: ${prod.stok_saat_ini} ${prod.satuan} (Batas minimum: ${prod.batas_stok_minimum})`;
+            infoEl.textContent = `Stok saat ini: ${formatQty(prod.stok_saat_ini)} ${prod.satuan} (Batas minimum: ${prod.batas_stok_minimum})`;
         } else {
             infoEl.textContent = 'Stok saat ini: -';
         }
     });
 
-    // Submit Form Restock / Stock Opname
     document.getElementById('formRiwayatStok').addEventListener('submit', async (e) => {
         e.preventDefault();
         const produkId = Number(document.getElementById('stokProdukId').value);
         const jenis = document.getElementById('stokJenisPerubahan').value;
-        const jumlah = Number(document.getElementById('stokJumlah').value);
+        const jumlah = parseFloat(document.getElementById('stokJumlah').value);
         const keterangan = document.getElementById('stokKeterangan').value.trim();
 
         const produk = state.produkList.find((p) => p.id === produkId);
@@ -1487,13 +1569,13 @@ function initEventListeners() {
         let stokSesudah = stokSebelum;
 
         if (jenis === 'RESTOCK' || jenis === 'OPNAME_TAMBAH') {
-            stokSesudah = stokSebelum + jumlah;
+            stokSesudah = formatQty(stokSebelum + jumlah);
         } else if (jenis === 'OPNAME_KURANG') {
             if (jumlah > stokSebelum) {
                 Swal.fire('Jumlah Melebihi Stok', `Pengurangan (${jumlah}) tidak boleh melebihi stok saat ini (${stokSebelum}).`, 'warning');
                 return;
             }
-            stokSesudah = stokSebelum - jumlah;
+            stokSesudah = formatQty(stokSebelum - jumlah);
         }
 
         showLoading('Memperbarui stok & mencatat riwayat...');
@@ -1532,7 +1614,6 @@ function initEventListeners() {
         }
     });
 
-    // Event Listener POS (Search, Diskon, Pembayaran)
     document.getElementById('posSearchInput').addEventListener('input', renderPosProducts);
     document.getElementById('btnClearPosSearch').addEventListener('click', () => {
         document.getElementById('posSearchInput').value = '';
@@ -1559,13 +1640,11 @@ function initEventListeners() {
 
     document.getElementById('btnProsesBayar').addEventListener('click', prosesTransaksiBayar);
 
-    // Event Listener Modal Struk (Print 58mm & WhatsApp)
     document.getElementById('btnCetakStrukThermal').addEventListener('click', () => {
         window.print();
     });
     document.getElementById('btnKirimWaStruk').addEventListener('click', kirimStrukKeWhatsApp);
 
-    // Event Listener Laporan Transaksi & Export Excel
     document.getElementById('btnFilterLaporan').addEventListener('click', async () => {
         showLoading('Memfilter laporan transaksi...');
         try {
@@ -1588,13 +1667,11 @@ function initEventListeners() {
 
     document.getElementById('btnExportExcel').addEventListener('click', exportLaporanKeExcel);
 
-    // Event Listener Katalog Publik
     document.getElementById('katalogSearchInput').addEventListener('input', renderKatalogPublik);
     document.getElementById('btnToggleFullscreenKatalog').addEventListener('click', () => {
         document.getElementById('appWrapper').classList.toggle('kiosk-mode');
     });
 
-    // Event Listener Pengaturan Toko & Tambah Kategori
     document.getElementById('formPengaturanToko').addEventListener('submit', async (e) => {
         e.preventDefault();
         showLoading('Menyimpan pengaturan toko...');
