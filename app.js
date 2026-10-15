@@ -1,16 +1,39 @@
 /**
  * ============================================================================
  * KONFIGURASI SUPABASE
- * Ganti SUPABASE_URL dan SUPABASE_ANON_KEY dengan kredensial proyek Anda.
+ * Isi SUPABASE_URL dan SUPABASE_ANON_KEY di bawah ini dengan milik Anda.
+ * Jika belum diisi di kode, aplikasi akan meminta input otomatis di browser.
  * ============================================================================
  */
-const SUPABASE_URL = 'https://hpkdhmnpjwvljllvvyew.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_QtgYnR4GYItoMmicjt26pQ_EFCzzohz';
+const DEFAULT_SUPABASE_URL = 'https://hpkdhmnpjwvljllvvyew.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_QtgYnR4GYItoMmicjt26pQ_EFCzzohz';
 
 const BUCKET_PRODUK = 'produk-images';
 
-// Inisialisasi Client Supabase
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+function getSupabaseCredentials() {
+    const savedUrl = localStorage.getItem('POS_SUPABASE_URL');
+    const savedKey = localStorage.getItem('POS_SUPABASE_ANON_KEY');
+
+    const url = (DEFAULT_SUPABASE_URL && !DEFAULT_SUPABASE_URL.includes('YOUR_PROJECT_ID'))
+        ? DEFAULT_SUPABASE_URL
+        : (savedUrl || DEFAULT_SUPABASE_URL);
+
+    const key = (DEFAULT_SUPABASE_ANON_KEY && !DEFAULT_SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY'))
+        ? DEFAULT_SUPABASE_ANON_KEY
+        : (savedKey || DEFAULT_SUPABASE_ANON_KEY);
+
+    return { url: url.trim(), key: key.trim() };
+}
+
+let supabaseClient = null;
+function initSupabaseClient() {
+    const { url, key } = getSupabaseCredentials();
+    if (!url.includes('YOUR_PROJECT_ID') && !key.includes('YOUR_SUPABASE_ANON_KEY')) {
+        supabaseClient = window.supabase.createClient(url, key);
+        return true;
+    }
+    return false;
+}
 
 /**
  * ============================================================================
@@ -66,7 +89,7 @@ function formatAngkaBiasa(angka) {
 
 function formatQty(qty) {
     const num = Number(qty) || 0;
-    return parseFloat(num.toFixed(3));
+    return parseFloat(num.toFixed(2));
 }
 
 function formatTanggalWaktu(isoString) {
@@ -82,12 +105,15 @@ function formatTanggalWaktu(isoString) {
 }
 
 function showLoading(text = 'Memuat data...') {
-    document.getElementById('loadingText').textContent = text;
-    document.getElementById('loadingOverlay').classList.remove('d-none');
+    const textEl = document.getElementById('loadingText');
+    const overlayEl = document.getElementById('loadingOverlay');
+    if (textEl) textEl.textContent = text;
+    if (overlayEl) overlayEl.classList.remove('d-none');
 }
 
 function hideLoading() {
-    document.getElementById('loadingOverlay').classList.add('d-none');
+    const overlayEl = document.getElementById('loadingOverlay');
+    if (overlayEl) overlayEl.classList.add('d-none');
 }
 
 function escapeHtml(str) {
@@ -167,16 +193,21 @@ function compressImageClientSide(file, maxDimension = 800, quality = 0.7) {
  */
 document.addEventListener('DOMContentLoaded', async () => {
     const now = new Date();
-    document.getElementById('currentDateDisplay').textContent = now.toLocaleDateString('id-ID', {
-        weekday: 'long',
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-    });
+    const dateDisplay = document.getElementById('currentDateDisplay');
+    if (dateDisplay) {
+        dateDisplay.textContent = now.toLocaleDateString('id-ID', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    }
 
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-    document.getElementById('filterTanggalMulai').value = firstDay.toISOString().split('T')[0];
-    document.getElementById('filterTanggalAkhir').value = now.toISOString().split('T')[0];
+    const inputMulai = document.getElementById('filterTanggalMulai');
+    const inputAkhir = document.getElementById('filterTanggalAkhir');
+    if (inputMulai) inputMulai.value = firstDay.toISOString().split('T')[0];
+    if (inputAkhir) inputAkhir.value = now.toISOString().split('T')[0];
 
     initSpaNavigation();
     initEventListeners();
@@ -211,8 +242,12 @@ function initSpaNavigation() {
                 sec.classList.toggle('active', sec.id === targetId);
             });
 
-            pageTitle.textContent = titleMap[targetId] || 'Sistem POS Tembakau';
-            sidebar.classList.remove('show');
+            if (pageTitle) {
+                pageTitle.textContent = titleMap[targetId] || 'Sistem POS Tembakau';
+            }
+            if (sidebar) {
+                sidebar.classList.remove('show');
+            }
 
             if (targetId === 'sec-produk' && state.dataTables.produk) {
                 state.dataTables.produk.columns.adjust();
@@ -224,37 +259,82 @@ function initSpaNavigation() {
         });
     });
 
-    document.getElementById('btnToggleSidebar').addEventListener('click', () => {
-        sidebar.classList.add('show');
-    });
-    document.getElementById('btnCloseSidebar').addEventListener('click', () => {
-        sidebar.classList.remove('show');
-    });
+    const btnToggleSidebar = document.getElementById('btnToggleSidebar');
+    if (btnToggleSidebar) {
+        btnToggleSidebar.addEventListener('click', () => sidebar.classList.add('show'));
+    }
 
-    document.getElementById('btnQuickPos').addEventListener('click', () => {
-        document.querySelector('.nav-item-link[data-target="sec-pos"]').click();
-    });
-    document.getElementById('btnKeRiwayatStok').addEventListener('click', () => {
-        document.querySelector('.nav-item-link[data-target="sec-stok"]').click();
-    });
+    const btnCloseSidebar = document.getElementById('btnCloseSidebar');
+    if (btnCloseSidebar) {
+        btnCloseSidebar.addEventListener('click', () => sidebar.classList.remove('show'));
+    }
+
+    const btnQuickPos = document.getElementById('btnQuickPos');
+    if (btnQuickPos) {
+        btnQuickPos.addEventListener('click', () => {
+            const posTab = document.querySelector('.nav-item-link[data-target="sec-pos"]');
+            if (posTab) posTab.click();
+        });
+    }
+
+    const btnKeRiwayatStok = document.getElementById('btnKeRiwayatStok');
+    if (btnKeRiwayatStok) {
+        btnKeRiwayatStok.addEventListener('click', () => {
+            const stokTab = document.querySelector('.nav-item-link[data-target="sec-stok"]');
+            if (stokTab) stokTab.click();
+        });
+    }
 }
 
 /**
  * ============================================================================
- * PEMUATAN DATA DARI SUPABASE
+ * KONEKSI & PEMUATAN DATA DARI SUPABASE
  * ============================================================================
  */
+async function promptKredensialSupabase() {
+    const { value: formValues } = await Swal.fire({
+        title: 'Hubungkan Database Supabase',
+        html: `
+            <p class="small text-muted mb-3">Tempelkan <b>Project URL</b> dan <b>Anon Public Key</b> dari menu <i>Project Settings -> API</i> di Supabase Anda:</p>
+            <div class="text-start mb-2">
+                <label class="form-label small fw-bold mb-1">SUPABASE_URL</label>
+                <input id="swal-sb-url" class="form-control form-control-sm" placeholder="https://xxxxxx.supabase.co">
+            </div>
+            <div class="text-start">
+                <label class="form-label small fw-bold mb-1">SUPABASE_ANON_KEY</label>
+                <input id="swal-sb-key" class="form-control form-control-sm" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6...">
+            </div>
+        `,
+        focusConfirm: false,
+        allowOutsideClick: false,
+        confirmButtonText: 'Simpan & Hubungkan',
+        confirmButtonColor: '#D4AF37',
+        preConfirm: () => {
+            const url = document.getElementById('swal-sb-url').value.trim();
+            const key = document.getElementById('swal-sb-key').value.trim();
+            if (!url || !key) {
+                Swal.showValidationMessage('URL dan Anon Key wajib diisi!');
+                return false;
+            }
+            return { url, key };
+        }
+    });
+
+    if (formValues) {
+        localStorage.setItem('POS_SUPABASE_URL', formValues.url);
+        localStorage.setItem('POS_SUPABASE_ANON_KEY', formValues.key);
+        await loadAllInitialData();
+    }
+}
+
 async function loadAllInitialData() {
     const statusBadge = document.getElementById('dbStatusBadge');
-    if (SUPABASE_URL.includes('YOUR_PROJECT_ID')) {
+    const isConfigured = initSupabaseClient();
+
+    if (!isConfigured) {
         statusBadge.className = 'badge bg-warning text-dark';
         statusBadge.textContent = 'Belum Dikonfigurasi';
-        Swal.fire({
-            icon: 'warning',
-            title: 'Kredensial Supabase Belum Diisi',
-            html: 'Silakan buka file <code>app.js</code> dan isi konstanta <b>SUPABASE_URL</b> serta <b>SUPABASE_ANON_KEY</b> dengan kredensial proyek Supabase Anda.',
-            confirmButtonColor: '#D4AF37'
-        });
+        await promptKredensialSupabase();
         return;
     }
 
@@ -280,7 +360,20 @@ async function loadAllInitialData() {
         console.error('Error memuat data:', error);
         statusBadge.className = 'badge bg-danger';
         statusBadge.textContent = 'Error Koneksi';
-        Swal.fire('Gagal Memuat Data', error.message || 'Periksa koneksi atau konfigurasi RLS Supabase Anda.', 'error');
+
+        const res = await Swal.fire({
+            icon: 'error',
+            title: 'Gagal Memuat Data Supabase',
+            text: error.message || 'Periksa koneksi atau konfigurasi URL/Anon Key Supabase Anda.',
+            showCancelButton: true,
+            confirmButtonText: 'Atur Ulang Kredensial',
+            cancelButtonText: 'Tutup',
+            confirmButtonColor: '#D4AF37'
+        });
+
+        if (res.isConfirmed) {
+            await promptKredensialSupabase();
+        }
     } finally {
         hideLoading();
     }
@@ -319,19 +412,23 @@ async function fetchKategori() {
     state.kategoriList = data || [];
 
     const selectKategori = document.getElementById('prodKategoriId');
-    selectKategori.innerHTML = state.kategoriList
-        .map((k) => `<option value="${k.id}">${escapeHtml(k.nama_kategori)}</option>`)
-        .join('');
+    if (selectKategori) {
+        selectKategori.innerHTML = state.kategoriList
+            .map((k) => `<option value="${k.id}">${escapeHtml(k.nama_kategori)}</option>`)
+            .join('');
+    }
 
     const listKategori = document.getElementById('listKategoriPengaturan');
-    listKategori.innerHTML = state.kategoriList
-        .map((k) => `
-            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
-                <span class="fw-medium"><i class="fa-solid fa-tag text-gold me-2"></i>${escapeHtml(k.nama_kategori)}</span>
-                <span class="badge bg-light text-secondary border">ID: ${k.id}</span>
-            </li>
-        `)
-        .join('');
+    if (listKategori) {
+        listKategori.innerHTML = state.kategoriList
+            .map((k) => `
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <span class="fw-medium"><i class="fa-solid fa-tag text-gold me-2"></i>${escapeHtml(k.nama_kategori)}</span>
+                    <span class="badge bg-light text-secondary border">ID: ${k.id}</span>
+                </li>
+            `)
+            .join('');
+    }
 }
 
 async function fetchProduk() {
@@ -594,6 +691,7 @@ window.hapusProduk = async function (id) {
  */
 function populateDropdownProdukStok() {
     const select = document.getElementById('stokProdukId');
+    if (!select) return;
     const currentVal = select.value;
     select.innerHTML = '<option value="">-- Pilih Produk --</option>' +
         state.produkList
@@ -657,7 +755,7 @@ function renderTabelRiwayatStok() {
 
 /**
  * ============================================================================
- * 4. MODUL KASIR (POINT OF SALE / POS) DENGAN INPUT NOMINAL DINAMIS
+ * 4. MODUL KASIR (POINT OF SALE / POS) DENGAN KOLOM HARGA DINAMIS
  * ============================================================================
  */
 function renderPosCategoryPills() {
@@ -729,7 +827,7 @@ function renderPosProducts() {
                                 <div class="fw-bold text-espresso">${formatRupiah(p.harga_ecer)} <small class="text-muted fw-normal">/${escapeHtml(p.satuan)}</small></div>
                                 ${
                                     adaGrosir
-                                        ? `<div class="text-success fw-semibold" style="font-size: 0.72rem;"><i class="fa-solid fa-tags me-1"></i>Grosir ≥${p.min_grosir}:${formatRupiah(p.harga_grosir)}</div>`
+                                        ? `<div class="text-success fw-semibold" style="font-size: 0.72rem;"><i class="fa-solid fa-tags me-1"></i>Grosir ≥${p.min_grosir}: ${formatRupiah(p.harga_grosir)}</div>`
                                         : `<div class="text-muted" style="font-size: 0.72rem;">Harga Tetap (Ecer)</div>`
                                 }
                             </div>
@@ -774,7 +872,7 @@ window.addToCart = function (produkId) {
             min_grosir: Number(produk.min_grosir),
             tipe_harga: 'ECER',
             manual_override: false,
-            lock_qty_mode: false, // false = Otomatis Takaran /Pouch menyesuaikan harga tetap; true = Kunci Qty & ubah harga /Pouch
+            lock_qty_mode: false, // false = Otomatis /Pouch menyesuaikan harga tetap; true = Kunci Qty & sesuaikan harga satuan
             harga_aktif: Number(produk.harga_ecer),
             subtotal_item: Number(produk.harga_ecer)
         };
@@ -823,23 +921,32 @@ window.updateCartQty = function (produkId, deltaOrValue, isDirectInput = false) 
     }
 
     item.qty = formatQty(newQty);
-    applyAutoWholesaleRule(item);
+    if (!item.lock_qty_mode) {
+        applyAutoWholesaleRule(item);
+    }
     item.subtotal_item = Math.round(item.qty * item.harga_aktif);
     renderCart();
 };
 
 /**
- * FUNGSI BARU: Mengubah Nominal Harga Item Secara Dinamis (Kolom Panah Merah)
- * Otomatis menyesuaikan takaran /Pouch terhadap harga yang sudah ditetapkan
+ * FUNGSI UTAMA KOLOM HARGA DINAMIS (YANG DITUNJUK PANAH MERAH)
+ * Ketika pembeli membeli di bawah atau di atas harga tetap, otomatis /Pouch menyesuaikan
  */
 window.onInputNominalItem = function (produkId, rawValue) {
     const item = state.cart.find((i) => i.produk_id === produkId);
     if (!item) return;
 
+    // Jika sedang dihapus kosong oleh kasir saat mengetik, jangan paksa render ulang
+    if (rawValue === '' || rawValue === null) {
+        item.subtotal_item = 0;
+        calculatePosTotals();
+        return;
+    }
+
     const nominal = Math.max(0, Number(rawValue) || 0);
 
     if (!item.lock_qty_mode) {
-        // MODE 1 (DEFAULT): Otomatis jumlah /Pouch menyesuaikan dengan harga yang sudah ditetapkan
+        // MODE 1 (DEFAULT): Otomatis jumlah /Pouch menyesuaikan dengan harga tetap yang sudah ditentukan
         let hargaAcuan = item.harga_ecer;
         if (!item.manual_override && item.min_grosir > 0 && item.harga_grosir > 0) {
             const estimasiQtyGrosir = nominal / item.harga_grosir;
@@ -859,25 +966,31 @@ window.onInputNominalItem = function (produkId, rawValue) {
 
         if (calculatedQty > item.stok_tersedia) {
             calculatedQty = item.stok_tersedia;
-            Swal.fire('Melebihi Stok', `Maksimal pembelian sesuai sisa stok adalah ${formatQty(item.stok_tersedia)} ${item.satuan}.`, 'warning');
         }
 
         item.qty = calculatedQty;
         item.subtotal_item = nominal;
 
-        // Update tampilan angka /Pouch secara live tanpa menghilangkan fokus kursor ketikan
+        // Perbarui tampilan angka /Pouch secara langsung tanpa menghilangkan fokus ketikan
         const qtyInputEl = document.getElementById(`cart-qty-input-${produkId}`);
-        if (qtyInputEl) qtyInputEl.value = item.qty;
+        if (qtyInputEl) {
+            qtyInputEl.value = item.qty;
+        }
     } else {
-        // MODE 2 (KUNCI QTY): Jumlah /Pouch tetap, harga satuan /Pouch yang menyesuaikan
+        // MODE 2 (KUNCI QTY): Jumlah /Pouch tetap utuh, harga satuan /Pouch yang menyesuaikan
         item.subtotal_item = nominal;
         item.harga_aktif = item.qty > 0 ? Math.round(nominal / item.qty) : nominal;
     }
 
-    // Update label harga satuan & badge secara live
+    // Perbarui label harga @ Rp ... /Pouch dan info rumus di bawah item
     const priceLabelEl = document.getElementById(`cart-price-label-${produkId}`);
     if (priceLabelEl) {
         priceLabelEl.textContent = `@ ${formatRupiah(item.harga_aktif)} /${item.satuan}`;
+    }
+
+    const infoFormulaEl = document.getElementById(`cart-formula-info-${produkId}`);
+    if (infoFormulaEl) {
+        infoFormulaEl.textContent = `Otomatis: ${formatQty(item.qty)} ${item.satuan} × ${formatRupiah(item.harga_aktif)} = ${formatRupiah(item.subtotal_item)}`;
     }
 
     const badgeEl = document.getElementById(`cart-badge-tipe-${produkId}`);
@@ -886,11 +999,22 @@ window.onInputNominalItem = function (produkId, rawValue) {
         badgeEl.innerHTML = `<i class="fa-solid fa-repeat me-1"></i>${item.tipe_harga}`;
     }
 
-    // Update ringkasan total di bagian atas & bawah keranjang
     const totalItems = formatQty(state.cart.reduce((sum, i) => sum + Number(i.qty || 0), 0));
     document.getElementById('posCartCountText').textContent = `${state.cart.length} Produk (${totalItems} Qty)`;
 
     calculatePosTotals();
+};
+
+window.onBlurNominalItem = function (produkId, inputEl) {
+    const item = state.cart.find((i) => i.produk_id === produkId);
+    if (!item) return;
+
+    if (inputEl.value === '' || Number(inputEl.value) <= 0) {
+        item.qty = 1;
+        applyAutoWholesaleRule(item);
+        item.subtotal_item = Math.round(item.qty * item.harga_aktif);
+        renderCart();
+    }
 };
 
 window.toggleLockQtyMode = function (produkId) {
@@ -899,9 +1023,11 @@ window.toggleLockQtyMode = function (produkId) {
 
     item.lock_qty_mode = !item.lock_qty_mode;
     if (!item.lock_qty_mode) {
-        // Kembalikan ke harga tetap dan sesuaikan /Pouch
         applyAutoWholesaleRule(item);
         item.qty = item.harga_aktif > 0 ? formatQty(item.subtotal_item / item.harga_aktif) : 1;
+    } else {
+        item.qty = Math.max(1, Math.round(item.qty));
+        item.harga_aktif = item.qty > 0 ? Math.round(item.subtotal_item / item.qty) : item.subtotal_item;
     }
     renderCart();
 };
@@ -967,30 +1093,41 @@ function renderCart() {
                         </div>
 
                         <div class="d-flex justify-content-between align-items-center gap-2 mt-2">
-                            <!-- Kontrol Kuantitas (/Pouch) Otomatis Menyesuaikan -->
+                            <!-- Kontrol Kuantitas (/Pouch) yang Otomatis Menyesuaikan -->
                             <div class="d-flex align-items-center gap-1">
-                                <div class="input-group input-group-sm" style="width: 138px;">
+                                <div class="input-group input-group-sm" style="width: 125px;">
                                     <button class="btn btn-outline-secondary px-2" type="button" onclick="updateCartQty(${item.produk_id}, -1)">-</button>
                                     <input type="number" id="cart-qty-input-${item.produk_id}" class="form-control text-center px-1 fw-bold" value="${item.qty}" min="0.01" max="${item.stok_tersedia}" step="any" onchange="updateCartQty(${item.produk_id}, this.value, true)">
                                     <button class="btn btn-outline-secondary px-2" type="button" onclick="updateCartQty(${item.produk_id}, 1)">+</button>
                                 </div>
-                                <span class="small text-muted fw-semibold">/${escapeHtml(item.satuan)}</span>
-                                <button type="button" class="btn btn-xs ${item.lock_qty_mode ? 'btn-espresso' : 'btn-outline-secondary'}" onclick="toggleLockQtyMode(${item.produk_id})" title="${item.lock_qty_mode ? 'Qty Dikunci (Ketik Rp untuk ubah harga satuan)' : 'Takaran Otomatis (Ketik Rp untuk sesuaikan jumlah /' + escapeHtml(item.satuan) + ')'}">
+                                <span class="small text-espresso fw-bold">/${escapeHtml(item.satuan)}</span>
+                                <button type="button" class="btn btn-xs ${item.lock_qty_mode ? 'btn-espresso' : 'btn-outline-secondary'}" onclick="toggleLockQtyMode(${item.produk_id})" title="${item.lock_qty_mode ? 'Mode Harga Custom: Qty dikunci, ketik Rp untuk ubah harga satuan' : 'Mode Takaran Otomatis: Ketik Rp untuk otomatis sesuaikan takaran /' + escapeHtml(item.satuan)}">
                                     <i class="fa-solid ${item.lock_qty_mode ? 'fa-lock' : 'fa-scale-balanced'}"></i>
                                 </button>
                             </div>
 
                             <!-- Kolom Input Harga Dinamis (Yang Ditunjuk Panah Merah) -->
-                            <div class="input-group input-group-sm" style="width: 145px;">
-                                <span class="input-group-text bg-warning-subtle text-espresso fw-bold px-2">Rp</span>
+                            <div class="input-group input-group-sm" style="width: 150px;">
+                                <span class="input-group-text bg-gold text-espresso fw-bold px-2 border-warning">Rp</span>
                                 <input type="number" 
-                                       class="form-control text-end fw-bold text-espresso px-2 border-warning" 
+                                       class="form-control text-end fw-bold text-espresso px-2 border-warning bg-warning-subtle" 
                                        value="${subtotalItem}" 
                                        min="0" 
                                        step="500"
-                                       title="Ketik nominal pembelian (di bawah/di atas harga tetap), takaran /${escapeHtml(item.satuan)} akan menyesuaikan otomatis"
-                                       oninput="onInputNominalItem(${item.produk_id}, this.value)">
+                                       placeholder="Nominal Rp"
+                                       title="Ketik nominal pembelian di bawah atau di atas harga tetap"
+                                       oninput="onInputNominalItem(${item.produk_id}, this.value)"
+                                       onblur="onBlurNominalItem(${item.produk_id}, this)">
                             </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                            <small class="text-success fw-medium" style="font-size: 0.72rem;" id="cart-formula-info-${item.produk_id}">
+                                Otomatis: ${formatQty(item.qty)} ${escapeHtml(item.satuan)} × ${formatRupiah(item.harga_aktif)} = ${formatRupiah(subtotalItem)}
+                            </small>
+                            <small class="text-muted" style="font-size: 0.68rem;">
+                                ${item.lock_qty_mode ? 'Mode: Ubah Harga' : `Mode: Auto /${escapeHtml(item.satuan)}`}
+                            </small>
                         </div>
                     </div>
                 `;
@@ -1066,6 +1203,7 @@ async function prosesTransaksiBayar() {
 
     showLoading('Memproses transaksi & memotong stok...');
     try {
+        // 1. Simpan ke tabel transaksi
         const { data: trxData, error: trxError } = await supabaseClient
             .from('transaksi')
             .insert([
@@ -1089,6 +1227,7 @@ async function prosesTransaksiBayar() {
 
         if (trxError) throw trxError;
 
+        // 2. Siapkan payload transaksi_detail
         const detailPayload = state.cart.map((item) => ({
             transaksi_id: trxData.id,
             produk_id: item.produk_id,
@@ -1102,19 +1241,41 @@ async function prosesTransaksiBayar() {
             subtotal_item: item.subtotal_item !== undefined ? item.subtotal_item : Math.round(item.qty * item.harga_aktif)
         }));
 
-        const { error: detailError } = await supabaseClient
+        let { error: detailError } = await supabaseClient
             .from('transaksi_detail')
             .insert(detailPayload);
 
-        if (detailError) throw detailError;
+        // Fallback otomatis jika kolom qty di database masih bertipe INTEGER
+        if (detailError && String(detailError.message).includes('integer')) {
+            const detailPayloadInt = detailPayload.map((d) => ({
+                ...d,
+                qty: Math.max(1, Math.round(d.qty))
+            }));
+            const retryDetail = await supabaseClient.from('transaksi_detail').insert(detailPayloadInt);
+            if (retryDetail.error) throw retryDetail.error;
+        } else if (detailError) {
+            throw detailError;
+        }
 
+        // 3. Kurangi stok_saat_ini di tabel produk
         for (const item of state.cart) {
             const stokBaru = Math.max(0, formatQty(item.stok_tersedia - item.qty));
-            const { error: stokErr } = await supabaseClient
+            let { error: stokErr } = await supabaseClient
                 .from('produk')
                 .update({ stok_saat_ini: stokBaru, updated_at: new Date().toISOString() })
                 .eq('id', item.produk_id);
-            if (stokErr) throw stokErr;
+
+            // Fallback otomatis jika kolom stok_saat_ini masih INTEGER
+            if (stokErr && String(stokErr.message).includes('integer')) {
+                const stokBulat = Math.max(0, Math.floor(stokBaru));
+                const retryStok = await supabaseClient
+                    .from('produk')
+                    .update({ stok_saat_ini: stokBulat, updated_at: new Date().toISOString() })
+                    .eq('id', item.produk_id);
+                if (retryStok.error) throw retryStok.error;
+            } else if (stokErr) {
+                throw stokErr;
+            }
         }
 
         const strukObj = {
@@ -1335,7 +1496,7 @@ function exportLaporanKeExcel() {
                 'Kode Produk': d.kode_produk_snapshot || '-',
                 'Nama Produk': d.nama_produk_snapshot,
                 'Tipe Harga': d.tipe_harga,
-                'Qty': Number(d.qty),
+                'Qty': formatQty(d.qty),
                 'Satuan': d.satuan_snapshot || '-',
                 'Harga Modal Satuan (Rp)': Number(d.harga_modal_satuan),
                 'Harga Jual Satuan (Rp)': Number(d.harga_jual_satuan),
